@@ -9,13 +9,14 @@ from pymongo import MongoClient
 
 app = Flask(__name__)
 app.config['CELERY_BROKER_URL'] = 'amqp://rabbitmq//'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://redis:6379/0'
+app.config['result_backend'] = 'redis://redis:6379/0'
 app.config['MONGO_URI'] = 'mongodb://mongo:27017/playstore_db'
 
 client = MongoClient(app.config['MONGO_URI'])
 db = client.get_database()
 coll = db["app_details"]
 
+# Create primary key for appId
 coll.create_index("appId", unique=True)
 
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
@@ -47,7 +48,7 @@ def get_app_details():
 
     # return jsonify(app_details), 200
     # echo.delay(datetime.now())
-    return "Stated fetching..."
+    return "Stated fetching...", 200
 
 @app.route("/get_details")
 def get_one_app_detail():
@@ -61,31 +62,51 @@ def get_one_app_detail():
         return jsonify(data), 200
 
 
-def souped(html_text):
-    app_id_lists = []
-    soup = BeautifulSoup(html_text, "html.parser")
-    a1 = soup.findAll(class_="Si6A0c Gy4nib")
-    for x in a1:
-        url = x.get("href")
-        if url != None:
-            app_id = url.split("=")[1]
-            # print(app_id)
-            app_id_lists.append(app_id)
-    return app_id_lists
+# def souped(html_text):
+#     app_id_lists = []
+#     soup = BeautifulSoup(html_text, "html.parser")
+#     a1 = soup.findAll(class_="Si6A0c Gy4nib")
+#     for x in a1:
+#         url = x.get("href")
+#         if url != None:
+#             app_id = url.split("=")[1]
+#             # print(app_id)
+#             app_id_lists.append(app_id)
+#     return app_id_lists
 
+# This will return list of all the unique app_id list
+def souped(html_text):
+    # app_id_list = []
+    soup = BeautifulSoup(html_text, "html.parser")
+    a_tags = soup.findAll("a")
+    ids2 = []
+    for x in a_tags:
+        try:
+            href = x["href"]
+        except Exception as e:
+            print("Error", e)
+            continue
+        if "?id=" in href:
+            if "details" in href:
+                #print(href)
+                ids2.append(href.split("=")[1])
+    return set(ids2)
+
+# This function used to get details from lib 
+# And save it to database
 def get_details(app_id_lists):
-    count = 0
+    # count = 0
     for x in app_id_lists:
-        if count == 2:
-            return
+        # if count == 2:
+        #     return
         # This will fetch details from google play store using
         # google_play_scraper lib
         data = play_detail(x, lang="en", country="us")
         store_in_database(data)
-        count += 1
         
         
 
+# This function is used to save app detail to database 
 def store_in_database(app_detail):
     # Implement database storage logic here
     print("from store in database", app_detail.get("appId"))
@@ -102,9 +123,6 @@ def store_in_database(app_detail):
 
 @celery.task
 def scrape_package_names():
-    # Implement scraping of package names from the Play Store games page
-    # You can use libraries like BeautifulSoup or Scrapy for web scraping
-    # Return a list of package names
     r = requests.get("https://play.google.com/store/games?hl=en&gl=US")
     if r.status_code == 200:
         app_id_lists = souped(r.text)
