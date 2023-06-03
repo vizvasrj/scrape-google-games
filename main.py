@@ -26,10 +26,10 @@ celery.conf.update(app.config)
 # def scrape_playstore(package_name):
 #     return app(package=package_name, lang='en', country='us')
 
-@celery.task
-def echo(time):
-    print("i am celery", time)
-    return True
+# @celery.task
+# def echo(time):
+#     print("i am celery", time)
+#     return True
 
 @app.route('/api/apps')
 def get_app_details():
