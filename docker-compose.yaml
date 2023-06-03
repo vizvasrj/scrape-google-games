@@ -1,0 +1,62 @@
+version: '3'
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+          sh -c "python main.py"
+    ports:
+      - '5000:5000'
+    depends_on:
+      - mongo
+      - redis
+      - rabbitmq
+    restart: unless-stopped
+    networks:
+      - my-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+          sh -c "celery -A main.celery worker -l info"
+    depends_on:
+      - web
+      - mongo
+      - redis
+      - rabbitmq
+    restart: unless-stopped
+    networks:
+      - my-network
+    
+
+  mongo:
+    image: mongo
+    ports:
+      - '27017:27017'
+    networks:
+      - my-network
+
+
+  redis:
+    image: redis
+    ports:
+      - '6379:6379'
+    networks:
+      - my-network
+
+
+  rabbitmq:
+    image: rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    networks:
+      - my-network
+
+
+
+networks:
+  my-network:
